@@ -1,0 +1,69 @@
+main:
+  push_lit 200
+  call_sub iota
+  halt
+
+iota: ; ( n -- )
+  pick 0
+  call_sub fib_iter
+  call_sub compile
+  push_lit 1
+  sub
+  pick 0
+  push_lit 0
+  not_equals?
+  jump_cond iota
+  drop
+  return
+
+compile: ; ( a -- )
+  dict
+  set_mem
+  push_lit 1
+  allocate
+  return
+
+fib: ; ( n -- fib(n) )
+  init_frame 1
+  push_slot 0
+  push_lit 2
+  less_than?
+  jump_cond fib_base_case
+  push_slot 0
+  push_lit 2
+  sub
+  call_sub fib
+  push_slot 0
+  push_lit 1
+  sub
+  call_sub fib
+  add
+  swap 1
+  drop
+fib_base_case:
+  return
+
+fib_iter: ; ( n -- f )
+  pick 0
+  push_lit 2
+  less_than?
+  jump_cond fib_iter_base_case
+  push_lit 0
+  push_lit 1
+  swap 2
+:
+  push_return ; current iteration
+  pick 0
+  swap 2
+  add
+  pop_return
+  push_lit 1
+  sub
+  pick 0
+  push_lit 0
+  not_equals?
+  jump_cond :-
+  drop
+  drop
+fib_iter_base_case:
+  return

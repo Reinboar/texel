@@ -1,0 +1,123 @@
+(define setm (addr n)
+    (raw_vm "push_slot 1"
+            "push_slot 0"
+            "set_mem"
+            "push_lit 0"))
+
+(define getm (addr)
+    (raw_vm "push_slot 0"
+            "push_mem"))
+
+(define setm* (addr offset n)
+    (setm (+ addr offset) n))
+
+(define getm* (addr offset)
+    (getm (+ addr offset)))
+
+(define not (v)
+    (if (= v 0)
+        1
+        0))
+
+(define break ()
+    (raw_vm "breakpoint"
+            "push_lit 0"))
+
+(define dalloc (n)
+    (raw_vm "dict"
+            "push_slot 0"
+            "allocate"))
+
+(define write-block-header (addr used? size prev next)
+    (begin
+        (setm* addr 0 used?) ; used? flag
+        (setm* addr 1 size)
+        (setm* addr 2 prev)
+        (setm* addr 3 next)))
+
+(define block-used? (addr)
+    (!= (getm addr) 0))
+
+(define block-size (addr)
+    (getm* addr 1))
+
+(define block-prev (addr)
+    (getm* addr 2))
+
+(define block-next (addr)
+    (getm* addr 3))
+
+(define block-content (addr)
+    (+ addr 4))
+
+(define chew-block (addr req-size)
+    (let ((content-addr (block-content addr))
+          (old-size        (block-size addr))
+          (old-prev        (block-prev addr))
+          (old-next        (block-next addr)))
+        (if (or (> req-size old-size) (block-used? addr))
+                -1
+                (begin
+                    (write-block-header addr
+                                        1
+                                        req-size
+                                        old-prev
+                                        (+ addr (+ 4 req-size)))
+                    (write-block-header (+ addr (+ 4 req-size))
+                                        0
+                                        (- old-size req-size)
+                                        addr
+                                        old-next)
+                    addr))))
+
+(define join-block (addr)
+    (let ((next-addr (block-next addr)))
+        (if (or (block-used? addr)
+                (or (= next-addr 0)
+                    (block-used? next-addr)))
+            -1
+            (begin
+                (write-block-header addr
+                                    0
+                                    (+ (block-size addr) (+ (block-size next-addr) 4))
+                                    (block-prev addr)
+                                    (block-next next-addr))
+                addr))))
+
+(defg heap-ptr 0)
+
+(define check-block (size block-ptr)
+    (if (or (block-used? block-ptr)
+            (> size (block-size block-ptr)))
+        -1
+        (chew-block block-ptr size)))
+
+(define malloc (size)
+    (let ((current-block heap-ptr)
+          (found-block -1))
+        (begin
+        (while (and (!= current-block 0) (= found-block -1))
+                (begin
+                    (setv found-block (check-block size current-block))
+                    (setv current-block (block-next current-block))))
+        (+ found-block 4))))
+
+(define free (ptr)
+    (let ((real-ptr (- ptr 4))
+          (
+
+(define init-heap (size)
+    (begin
+        (setv heap-ptr (dalloc size))
+        (write-block-header heap-ptr
+                            0
+                            size
+                            0
+                            0)
+        heap-ptr))
+
+(init-heap 1000)
+
+(malloc 100)
+(malloc 50)
+(malloc 75)
