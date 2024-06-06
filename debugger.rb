@@ -9,10 +9,11 @@ module TexelLisp
   end
 
   class Disassembler
-    attr_accessor :instructions
+    attr_accessor :instructions, :labels
 
-    def initialize
+    def initialize(labels={})
       @instructions = []
+      @labels = labels
     end
 
     def self.default
@@ -53,7 +54,27 @@ module TexelLisp
       self
     end
 
-    def output_instructions(bytes, num=1)
+    def label_comment(target)
+      target_label = @labels.invert[target]
+      return " ; #{target_label}" if target_label
+      ""
+    end
+
+    def jump_call_comment(lead, arg, extra, ip)
+      case lead
+      when 8 # jump_abs
+      when 10 # call_sub
+        label_comment(extra)
+      when 7 # jump_rel
+      when 9 # jump_cond
+      when 21 # not_jump_cond
+        label_comment(arg + ip)
+      else
+        ""
+      end
+    end
+
+    def output_instructions(bytes, num=1, instr_ptr=0)
       raise "Argument must be an array" unless bytes.is_a?(Array)
       raise "Can't pass an empty array" if bytes.empty?
       current_byte = 0
@@ -72,6 +93,7 @@ module TexelLisp
         output_line += instr.name.call(instr_val, arg_val, bytes[current_byte..current_byte+instr.extra_bytes]) if instr.name.is_a?(Proc)
         output_line += " #{arg_val}" if instr.has_arg && instr.name.is_a?(String)
         output_line += " #{bytes[current_byte+1]}" if instr.extra_bytes > 0
+        output_line += jump_call_comment(lead_byte, arg_val, bytes[current_byte+1], instr_ptr + current_byte)
         total_output += output_line + "\n"
         current_byte += 1 + instr.extra_bytes
       end
@@ -80,10 +102,11 @@ module TexelLisp
   end
 
   class Debugger
-    attr_accessor :vm, :disasm
+    attr_accessor :vm, :as, :disasm
 
-    def initialize(vm, disasm=Disassembler.default)
-      @disasm, @vm = disasm, vm
+    def initialize(vm, as, disasm=Disassembler.default)
+      @as, @disasm, @vm = as, disasm, vm
+      @disasm.labels = @as.labels
     end
 
     def debug
