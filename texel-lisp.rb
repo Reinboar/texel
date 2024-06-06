@@ -190,10 +190,6 @@ end
   compiler.context = compiler.context.parent
   let_final_code
 end
-  .add_special("test") do |compiler, children|
-  binding.irb
-  "push_lit 0"
-end
 
 parser = TexelLisp::Parser.from_file("./test.tx")
 node = parser.parse
@@ -201,6 +197,6 @@ node_output = node.to_a.map { |n| c.compile(n) }.join("\ndrop\n")
 code = node_output + "\nhalt\n\n" + c.compile_defs
 as = TexelLisp::StackVMAssembler.new(code: code)
 vm = TexelLisp::StackVM.from_code(as.assemble)
-debugger = TexelLisp::Debugger.new(vm)
+debugger = TexelLisp::Debugger.new(vm, as)
 debugger.debug
 binding.irb
