@@ -38,14 +38,29 @@
 (define block-used? (addr)
     (!= (getm addr) 0))
 
+(define block-free? (addr)
+    (= (getm addr) 0))
+
+(define block-used! (addr val)
+    (setm addr val))
+
 (define block-size (addr)
     (getm* addr 1))
+
+(define block-size! (addr val)
+    (setm* addr 1 val))
 
 (define block-prev (addr)
     (getm* addr 2))
 
+(define block-prev! (addr val)
+    (setm* addr 2 val))
+
 (define block-next (addr)
     (getm* addr 3))
+
+(define block-next! (addr val)
+    (setm* addr 3 val))
 
 (define block-content (addr)
     (+ addr 4))
@@ -58,31 +73,39 @@
         (if (or (> req-size old-size) (block-used? addr))
                 -1
                 (begin
-                    (write-block-header addr
+                    (write-block-header addr ; create requested block
                                         1
                                         req-size
                                         old-prev
                                         (+ addr (+ 4 req-size)))
-                    (write-block-header (+ addr (+ 4 req-size))
+                    (write-block-header (+ addr (+ 4 req-size)) ; truncate the free block
                                         0
                                         (- old-size req-size)
                                         addr
                                         old-next)
+                    (if (!= old-next 0) (block-prev! old-next (+ addr (+ 4 req-size))) 0)
                     addr))))
 
-(define join-block (addr)
+(define absorb-next-block (addr)
     (let ((next-addr (block-next addr)))
-        (if (or (block-used? addr)
-                (or (= next-addr 0)
-                    (block-used? next-addr)))
-            -1
+        (if (or (block-used? next-addr) (= next-addr 0))
+            0
             (begin
-                (write-block-header addr
-                                    0
-                                    (+ (block-size addr) (+ (block-size next-addr) 4))
-                                    (block-prev addr)
-                                    (block-next next-addr))
+                (block-size! addr (+ (block-size addr) (+ (block-size next-addr) 4)))
+                (block-prev! (block-next next-addr) addr)
+                (block-next! addr (block-next next-addr))
                 addr))))
+
+(define absorb-into-prev-block (addr)
+    (let ((prev-addr (block-prev addr)))
+        (if (or (block-used? prev-addr) (= prev-addr 0))
+            0
+            (absorb-next-block prev-addr))))
+
+(define join-block (addr)
+    (begin
+        (absorb-next-block addr)
+        (absorb-into-prev-block addr)))
 
 (defg heap-ptr 0)
 
@@ -103,8 +126,13 @@
         (+ found-block 4))))
 
 (define free (ptr)
-    (let ((real-ptr (- ptr 4))
-          (
+    (let ((real-ptr (- ptr 4)))
+        (if (not (block-used? real-ptr))
+            0
+            (begin
+                (block-used! real-ptr 0)
+                (join-block real-ptr)
+                1))))
 
 (define init-heap (size)
     (begin
@@ -118,6 +146,9 @@
 
 (init-heap 1000)
 
-(malloc 100)
-(malloc 50)
-(malloc 75)
+(let ((first  (malloc 50))
+      (second (malloc 50))
+      (third  (malloc 50)))
+    (begin
+        (free second)
+        (malloc 25)))
