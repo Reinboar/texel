@@ -144,11 +144,71 @@
                             0)
         heap-ptr))
 
-(init-heap 1000)
+(define make-array (size)
+    (malloc size))
 
-(let ((first  (malloc 50))
-      (second (malloc 50))
-      (third  (malloc 50)))
-    (begin
-        (free second)
-        (malloc 25)))
+(define array-get (array index)
+   (getm* array index))
+
+(define array-set (array index value)
+    (setm* array index value))
+
+(define copy-array (array size)
+    (let ((copied-array (make-array size))
+          (i 0))
+        (begin
+            (while (< i size)
+                (begin
+                    (array-set copied-array i (array-get array i))
+                    (setv i (+ i 1))))
+            copied-array)))
+
+(define slice-array (array start end)
+    (copy-array (+ array start)
+                (+ (- end start) 1)))
+
+(define clear-array (array size)
+    (let ((i 0))
+        (begin
+            (while (< i size)
+                (begin
+                    (array-set array i 0)
+                    (setv i (+ i 1))))
+            array)))
+
+(define array-map (array size f)
+    (let ((i 0))
+        (begin
+            (while (< i size)
+                (begin
+                    (array-set array i (call f (array-get array i)))
+                    (setv i (+ i 1))))
+            array)))
+
+(define array-map-with-index (array size f)
+    (let ((i 0))
+        (begin
+            (while (< i size)
+                (begin
+                    (array-set array i (call f (array-get array i) i))
+                    (setv i (+ i 1))))
+            array)))
+
+(define array-reduce (array size init f)
+    (let ((i 0)
+          (a init))
+        (begin
+            (while (< i size)
+                (begin
+                    (setv a (call f a (array-get array i)))
+                    (setv i (+ i 1))))
+            a)))
+
+(define string-length (str)
+    (let ((i 0))
+        (begin
+            (while (!= (getm* str i) 0)
+                (setv i (+ i 1)))
+            i)))
+
+(init-heap 1000)
